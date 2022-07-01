@@ -161,6 +161,9 @@ typedef struct {
     uint64 num_phys_markers;
     byte *v2p_buf;
     uint64 num_v2p_writeouts; /* v2p_buf writeout instances. */
+#if defined(LINUX) && defined(X86_64)
+    uint num_syscalls;
+#endif
 } per_thread_t;
 
 #define MAX_NUM_DELAY_INSTRS 32
@@ -1343,6 +1346,9 @@ event_filter_syscall(void *drcontext, int sysnum);
 static bool
 event_pre_syscall(void *drcontext, int sysnum);
 
+static bool
+event_post_syscall(void *drcontext, int sysnum);
+
 static void
 event_kernel_xfer(void *drcontext, const dr_kernel_xfer_info_t *info);
 
@@ -1485,6 +1491,7 @@ instrumentation_exit()
 {
     dr_unregister_filter_syscall_event(event_filter_syscall);
     if (!drmgr_unregister_pre_syscall_event(event_pre_syscall) ||
+        !drmgr_unregister_post_syscall_event(event_post_syscall) ||
         !drmgr_unregister_kernel_xfer_event(event_kernel_xfer) ||
         !drmgr_unregister_bb_app2app_event(event_bb_app2app))
         DR_ASSERT(false);
@@ -1528,6 +1535,7 @@ instrumentation_init()
 {
     instrumentation_drbbdup_init();
     if (!drmgr_register_pre_syscall_event(event_pre_syscall) ||
+        !drmgr_register_post_syscall_event(event_post_syscall) ||
         !drmgr_register_kernel_xfer_event(event_kernel_xfer) ||
         !drmgr_register_bb_app2app_event(event_bb_app2app, &pri_pre_bbdup))
         DR_ASSERT(false);
@@ -2387,8 +2395,29 @@ event_pre_syscall(void *drcontext, int sysnum)
         }
     }
 #endif
+#if defined(X86_64) && defined(LINUX)
+    trace_marker_type_t marker_type;
+    uintptr_t marker_val = data->num_syscalls++;
+    BUF_PTR(data->seg_base) +=
+        instru->append_marker(BUF_PTR(data->seg_base), marker_type, marker_val);
+#endif
     if (file_ops_func.handoff_buf == NULL)
         memtrace(drcontext, false);
+    return true;
+}
+
+static bool
+event_post_syscall(void *drcontext, int sysnum)
+{
+#if defined(X86_64) && defined(LINUX)
+    per_thread_t *data = (per_thread_t *)drmgr_get_tls_field(drcontext, tls_idx);
+    if (tracing_disabled.load(std::memory_order_acquire) != BBDUP_MODE_TRACE)
+        return true;
+    if (BUF_PTR(data->seg_base) == NULL)
+        return true; /* This thread was filtered out. */
+    if (file_ops_func.handoff_buf == NULL)
+        memtrace(drcontext, false);
+#endif
     return true;
 }
 
