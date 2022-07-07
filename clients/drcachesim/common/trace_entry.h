@@ -369,6 +369,12 @@ typedef enum {
      */
     TRACE_MARKER_TYPE_PAGE_SIZE,
 
+#if defined(X86_64) && defined(LINUX)
+    /**
+     * The marker value contains Intel PT trace's syscall's ID.
+     */
+    TRACE_MARKER_TYPE_SYSCALL_ID,
+#endif
     // ...
     // These values are reserved for future built-in marker types.
     // ...
