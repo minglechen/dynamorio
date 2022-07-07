@@ -2396,20 +2396,13 @@ event_filter_syscall(void *drcontext, int sysnum)
 static void
 write_memory(void *addr, size_t size, char *filename)
 {
-    // dr_printf("write_memory %s\n", filename);
-    // void *readout = malloc(size);
-    // dr_printf("write_memory 1 %s\n", filename);
-    // memcpy(readout, addr, size);
-    dr_printf("Writing %s\n", filename);
     FILE *fd = fopen(filename, "wb");
     fwrite(addr, 1, size, fd);
     fclose(fd);
-    // free(readout);
-    dr_printf("Finish Writing %s\n", filename);
 }
 
 static bool
-start_recording_pt(per_thread_t *data)
+start_recording_pt(per_thread_t *data, int sysnum)
 {
     struct perf_event_attr pe;
     memset(&pe, 0, sizeof(pe));
@@ -2418,8 +2411,10 @@ start_recording_pt(per_thread_t *data)
     pe.config = 0x300e603;
     pe.disabled = 1;
     pe.exclude_user = 1;
+    // pe.exclude_hv = 1;
+    // pe.exclude_idle = 1;
     errno = 0;
-    data->fd = syscall(SYS_perf_event_open, &pe, 0, -1, -1, 0);
+    data->fd = syscall(SYS_perf_event_open, &pe, getpid(), -1, -1, 0);
     if (data->fd == -1) {
         dr_printf("perf_event_open failed: %d\n", errno);
         return false;
@@ -2434,20 +2429,18 @@ start_recording_pt(per_thread_t *data)
     }
 
     struct perf_event_mmap_page *header = (struct perf_event_mmap_page *)data->base;
-    dr_printf("header->data_offset: %" PRIu64 "\n", header->data_offset);
-    dr_printf("header->data_size: %" PRIu64 "\n", header->data_size);
     data->data = header + header->data_offset;
 
     header->aux_offset = header->data_offset + header->data_size;
     header->aux_size = (1 << m) * PAGE_SIZE;
 
-    data->aux =
-        mmap(NULL, header->aux_size, PROT_READ, MAP_SHARED, data->fd, header->aux_offset);
+    data->aux = mmap(NULL, header->aux_size, PROT_READ | PROT_WRITE, MAP_SHARED, data->fd,
+                     header->aux_offset);
     if (data->aux == MAP_FAILED) {
         dr_printf("MAP_FAILED\n");
         return false;
     }
-
+    dr_printf("start recording %d\n", sysnum);
     ioctl(data->fd, PERF_EVENT_IOC_RESET, 0);
     ioctl(data->fd, PERF_EVENT_IOC_ENABLE, 0);
     return true;
@@ -2462,12 +2455,23 @@ end_recording_pt(per_thread_t *data)
     write_memory(
         data->aux, header->aux_size,
         &*(std::to_string(data->in_recording_syscall_id) + "_aux").begin());
-    write_memory(
-        data->data, header->data_size,
-        &*(std::to_string(data->in_recording_syscall_id) + "_data").begin());
+    // write_memory(
+    //     data->data, header->data_size,
+    //     &*(std::to_string(data->in_recording_syscall_id) + "_data").begin());
     write_memory(
         data->base, (1 + (1 << 15)) * PAGE_SIZE,
-        &*(std::to_string(data->in_recording_syscall_id) + "_base").begin());
+        &*(std::to_string(data->in_recording_syscall_id) + "_data").begin());
+    dr_printf("time_shift: %" PRIu64 "\n", header->time_shift);
+    dr_printf("time_mult: %" PRIu64 "\n", header->time_mult);
+    dr_printf("time_offset: %" PRIu64 "\n", header->time_offset);
+    dr_printf("time_zero: %" PRIu64 "\n", header->time_zero);
+    dr_printf("aux_head: %" PRIu64 "\n", header->aux_head);
+    dr_printf("aux_tail: %" PRIu64 "\n", header->aux_tail);
+    dr_printf("aux_size: %" PRIu64 "\n", header->aux_size);
+    dr_printf("aut_offset: %" PRIu64 "\n", header->aux_offset);
+    // write_memory(
+    //     data->base, (1 + (1 << 15)) * PAGE_SIZE,
+    //     &*(std::to_string(data->in_recording_syscall_id) + "_base").begin());
     close(data->fd);
     munmap(data->aux, header->aux_size);
     munmap(data->base, (1 + (1 << 15)) * PAGE_SIZE);
@@ -2493,13 +2497,12 @@ event_pre_syscall(void *drcontext, int sysnum)
     }
 #endif
 #if defined(X86_64) && defined(LINUX)
-    dr_printf("%s:%d: %d\n", __FILE__, __LINE__, sysnum);
     trace_marker_type_t marker_type;
     marker_type = TRACE_MARKER_TYPE_SYSCALL_ID;
     uintptr_t marker_val = ++data->num_syscalls;
     BUF_PTR(data->seg_base) +=
         instru->append_marker(BUF_PTR(data->seg_base), marker_type, marker_val);
-    if (!data->in_recording_syscall && start_recording_pt(data)) {
+    if (!data->in_recording_syscall && start_recording_pt(data, sysnum)) {
         data->in_recording_syscall = true;
         data->in_recording_sysnum = sysnum;
         data->in_recording_syscall_id = data->num_syscalls;
@@ -2514,7 +2517,6 @@ static void
 event_post_syscall(void *drcontext, int sysnum)
 {
 #if defined(X86_64) && defined(LINUX)
-    dr_printf("%s:%d: %d\n", __FILE__, __LINE__, sysnum);
     per_thread_t *data = (per_thread_t *)drmgr_get_tls_field(drcontext, tls_idx);
     if (tracing_disabled.load(std::memory_order_acquire) != BBDUP_MODE_TRACE)
         return;
