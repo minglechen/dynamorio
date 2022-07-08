@@ -2408,9 +2408,22 @@ start_recording_pt(per_thread_t *data, int sysnum)
     memset(&pe, 0, sizeof(pe));
     pe.type = 8; // cat /sys/bus/event_source/devices/intel_pt/type
     pe.size = sizeof(pe);
-    pe.config = 0x300e603;
+    pe.config = 0x300ee03;
+    // pe.sample_period = 1;
+    pe.sample_type =
+        PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
+    pe.read_format = PERF_FORMAT_ID;
     pe.disabled = 1;
+    // pe.inherit = 1;
+    // pe.exclude_hv = 1;
     pe.exclude_user = 1;
+    pe.enable_on_exec = 1;
+    pe.sample_id_all = 1;
+    pe.aux_watermark = 1048576;
+    // pe.exclude_user = 1;
+    // pe.mmap = 1;
+    // pe.mmap2 = 1;
+    // pe.comm = 1;
     // pe.exclude_hv = 1;
     // pe.exclude_idle = 1;
     errno = 0;
@@ -2452,23 +2465,25 @@ end_recording_pt(per_thread_t *data)
     struct perf_event_mmap_page *header = (struct perf_event_mmap_page *)data->base;
     ioctl(data->fd, PERF_EVENT_IOC_DISABLE, 0);
     dr_printf("end recording %d\n", data->in_recording_sysnum);
-    write_memory(
-        data->aux, header->aux_size,
-        &*(std::to_string(data->in_recording_syscall_id) + "_aux").begin());
-    // write_memory(
-    //     data->data, header->data_size,
-    //     &*(std::to_string(data->in_recording_syscall_id) + "_data").begin());
-    write_memory(
-        data->base, (1 + (1 << 15)) * PAGE_SIZE,
-        &*(std::to_string(data->in_recording_syscall_id) + "_data").begin());
     dr_printf("time_shift: %" PRIu64 "\n", header->time_shift);
     dr_printf("time_mult: %" PRIu64 "\n", header->time_mult);
     dr_printf("time_offset: %" PRIu64 "\n", header->time_offset);
     dr_printf("time_zero: %" PRIu64 "\n", header->time_zero);
+    dr_printf("data_head: %" PRIu64 "\n", header->data_head);
+    dr_printf("data_tail: %" PRIu64 "\n", header->data_tail);
+    dr_printf("data_size: %" PRIu64 "\n", header->data_size);
+    dr_printf("data_offset: %" PRIu64 "\n", header->data_offset);
     dr_printf("aux_head: %" PRIu64 "\n", header->aux_head);
     dr_printf("aux_tail: %" PRIu64 "\n", header->aux_tail);
     dr_printf("aux_size: %" PRIu64 "\n", header->aux_size);
     dr_printf("aut_offset: %" PRIu64 "\n", header->aux_offset);
+
+    write_memory((void *)((uint8_t *)data->aux + header->aux_tail),
+                 header->aux_head - header->aux_tail,
+                 &*(std::to_string(data->in_recording_syscall_id) + "_aux").begin());
+    write_memory((void *)((uint8_t *)data->data + header->data_tail),
+                 header->data_head - header->data_tail,
+                 &*(std::to_string(data->in_recording_syscall_id) + "_data").begin());
     // write_memory(
     //     data->base, (1 + (1 << 15)) * PAGE_SIZE,
     //     &*(std::to_string(data->in_recording_syscall_id) + "_base").begin());
