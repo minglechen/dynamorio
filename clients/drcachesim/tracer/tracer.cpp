@@ -2408,24 +2408,10 @@ start_recording_pt(per_thread_t *data, int sysnum)
     memset(&pe, 0, sizeof(pe));
     pe.type = 8; // cat /sys/bus/event_source/devices/intel_pt/type
     pe.size = sizeof(pe);
-    pe.config = 0x300ee03;
-    // pe.sample_period = 1;
-    pe.sample_type =
-        PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
-    pe.read_format = PERF_FORMAT_ID;
-    pe.disabled = 1;
-    // pe.inherit = 1;
+    pe.config = 0x802;
     // pe.exclude_hv = 1;
-    pe.exclude_user = 1;
-    pe.enable_on_exec = 1;
-    pe.sample_id_all = 1;
-    pe.aux_watermark = 1048576;
     // pe.exclude_user = 1;
-    // pe.mmap = 1;
-    // pe.mmap2 = 1;
-    // pe.comm = 1;
-    // pe.exclude_hv = 1;
-    // pe.exclude_idle = 1;
+    pe.disabled = 1;
     errno = 0;
     data->fd = syscall(SYS_perf_event_open, &pe, getpid(), -1, -1, 0);
     if (data->fd == -1) {

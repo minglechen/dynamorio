@@ -197,6 +197,21 @@ pt2ir_t::init(IN pt2ir_config_t &pt2ir_config)
         return false;
     }
 
+    if (!pt2ir_config.elf_file_path.empty()) {
+        pt_image_ = pt_image_alloc(NULL);
+        errcode = load_elf(pt_iscache_, pt_image_, pt2ir_config.elf_file_path.c_str(),
+                           pt2ir_config.elf_base, "", 0);
+        if (errcode < 0) {
+            ERRMSG("Failed to load ELF file: %s.\n", pt_errstr(pt_errcode(errcode)));
+            return false;
+        }
+        errcode = pt_insn_set_image(pt_instr_decoder_, pt_image_);
+        if (errcode < 0) {
+            ERRMSG("Failed to set image: %s.\n", pt_errstr(pt_errcode(errcode)));
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -289,23 +304,27 @@ pt2ir_t::convert(OUT instrlist_t **ilist)
             /* Decode PT raw trace to pt_insn. */
             status = pt_insn_next(pt_instr_decoder_, &insn, sizeof(insn));
             if (status < 0) {
+                dr_fprintf(STDOUT, "[get next instruction error: %" PRIx64 "]\n", insn.ip);
                 dx_decoding_error(status, "get next instruction error", insn.ip);
-                instrlist_clear_and_destroy(GLOBAL_DCONTEXT, *ilist);
-                return PT2IR_CONV_ERROR_DECODE_NEXT_INSTR;
+                break;
             }
 
             /* Use drdecode to decode insn(pt_insn) to instr_t. */
             instr_t *instr = instr_create(GLOBAL_DCONTEXT);
             instr_init(GLOBAL_DCONTEXT, instr);
             decode(GLOBAL_DCONTEXT, insn.raw, instr);
-            instr_set_translation(instr, (app_pc)insn.ip);
             instr_allocate_raw_bits(GLOBAL_DCONTEXT, instr, insn.size);
+            instr_set_isa_mode(instr,
+                               insn.mode == ptem_32bit ? DR_ISA_IA32 : DR_ISA_AMD64);
+            instr_set_translation(instr, (app_pc)insn.ip);
             if (!instr_valid(instr)) {
-                ERRMSG("Failed to convert the libipt's IR to Dynamorio's IR.\n");
-                instrlist_clear_and_destroy(GLOBAL_DCONTEXT, *ilist);
-                return PT2IR_CONV_ERROR_DR_IR_CONVERT;
+                ERRMSG("Failed to convert the libipt's IR to Dynamorio's IR.(IP:%" PRIx64
+                       ")\n",
+                       insn.ip);
+                instr_free(GLOBAL_DCONTEXT, instr);
+            } else {
+                instrlist_append(*ilist, instr);
             }
-            instrlist_append(*ilist, instr);
         }
     }
     return PT2IR_CONV_SUCCESS;
