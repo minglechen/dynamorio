@@ -37,6 +37,7 @@
 
 #include <stdio.h>
 #include <iomanip>
+#include <fstream>
 #include <sstream>
 #include <string>
 
@@ -147,6 +148,27 @@ to_hex_string(T integer)
     sstream << "0x" << std::setfill('0') << std::setw(sizeof(T) * 2) << std::hex
             << integer;
     return sstream.str();
+}
+
+int
+parse_intelpt_config_format(std::string fname)
+{
+    int value = -1;
+    std::string line = "";
+    std::string path = "/sys/devices/intel_pt/format/" + fname;
+    std::ifstream f(path);
+    if (!f.is_open()) {
+        ERRMSG("Failed to open Intel PT format file: %s.\n", path.c_str());
+        return value;
+    }
+    if (!std::getline(f, line)) {
+        ERRMSG("Failed to get the content of Intel PT format file: %s.\n", path.c_str());
+        f.close();
+        return -1;
+    }
+    sscanf(line.c_str(), "config:%d", value);
+    f.close();
+    return value;
 }
 
 #endif /* _UTILS_H_ */
