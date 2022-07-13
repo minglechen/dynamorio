@@ -304,7 +304,8 @@ pt2ir_t::convert(OUT instrlist_t **ilist)
             /* Decode PT raw trace to pt_insn. */
             status = pt_insn_next(pt_instr_decoder_, &insn, sizeof(insn));
             if (status < 0) {
-                dr_fprintf(STDOUT, "[get next instruction error: %" PRIx64 "]\n", insn.ip);
+                dr_fprintf(STDOUT, "[get next instruction error: %" PRIx64 "]\n",
+                           insn.ip);
                 dx_decoding_error(status, "get next instruction error", insn.ip);
                 break;
             }
@@ -317,10 +318,12 @@ pt2ir_t::convert(OUT instrlist_t **ilist)
             instr_set_isa_mode(instr,
                                insn.mode == ptem_32bit ? DR_ISA_IA32 : DR_ISA_AMD64);
             instr_set_translation(instr, (app_pc)insn.ip);
+            dr_fprintf(STDOUT, "%" PRIx64 "\n", insn.ip);
             if (!instr_valid(instr)) {
-                ERRMSG("Failed to convert the libipt's IR to Dynamorio's IR.(IP:%" PRIx64
-                       ")\n",
-                       insn.ip);
+                // ERRMSG("Failed to convert the libipt's IR to Dynamorio's IR.(Un support
+                // instruction IP:%" PRIx64
+                //        ")\n",
+                //        insn.ip);
                 instr_free(GLOBAL_DCONTEXT, instr);
             } else {
                 instrlist_append(*ilist, instr);

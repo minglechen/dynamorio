@@ -77,6 +77,7 @@
 #endif
 
 #if defined(X86_64) && defined(LINUX)
+#    include <unistd.h>
 #    include <inttypes.h>
 #    include <linux/perf_event.h>
 #    include <sys/mman.h>
@@ -111,6 +112,7 @@ static char logsubdir[MAXIMUM_PATH];
 static char subdir_prefix[MAXIMUM_PATH]; /* Holds op_subdir_prefix. */
 static file_t module_file;
 static file_t funclist_file = INVALID_FILE;
+static char kernel_logsubdir[MAXIMUM_PATH];
 static int notify_beyond_global_max_once;
 
 /* Max number of entries a buffer can have. It should be big enough
@@ -2410,7 +2412,7 @@ start_recording_pt(per_thread_t *data, int sysnum)
     pe.size = sizeof(pe);
     pe.config = 0x802;
     // pe.exclude_hv = 1;
-    // pe.exclude_user = 1;
+    pe.exclude_user = 1;
     pe.disabled = 1;
     errno = 0;
     data->fd = syscall(SYS_perf_event_open, &pe, getpid(), -1, -1, 0);
@@ -2439,37 +2441,40 @@ start_recording_pt(per_thread_t *data, int sysnum)
         dr_printf("MAP_FAILED\n");
         return false;
     }
-    dr_printf("start recording %d\n", sysnum);
+    // dr_printf("start recording %d\n", sysnum);
     ioctl(data->fd, PERF_EVENT_IOC_RESET, 0);
     ioctl(data->fd, PERF_EVENT_IOC_ENABLE, 0);
     return true;
 }
 
 static void
-end_recording_pt(per_thread_t *data)
+end_recording_pt(void *drcontext, per_thread_t *data)
 {
     struct perf_event_mmap_page *header = (struct perf_event_mmap_page *)data->base;
     ioctl(data->fd, PERF_EVENT_IOC_DISABLE, 0);
-    dr_printf("end recording %d\n", data->in_recording_sysnum);
-    dr_printf("time_shift: %" PRIu64 "\n", header->time_shift);
-    dr_printf("time_mult: %" PRIu64 "\n", header->time_mult);
-    dr_printf("time_offset: %" PRIu64 "\n", header->time_offset);
-    dr_printf("time_zero: %" PRIu64 "\n", header->time_zero);
-    dr_printf("data_head: %" PRIu64 "\n", header->data_head);
-    dr_printf("data_tail: %" PRIu64 "\n", header->data_tail);
-    dr_printf("data_size: %" PRIu64 "\n", header->data_size);
-    dr_printf("data_offset: %" PRIu64 "\n", header->data_offset);
-    dr_printf("aux_head: %" PRIu64 "\n", header->aux_head);
-    dr_printf("aux_tail: %" PRIu64 "\n", header->aux_tail);
-    dr_printf("aux_size: %" PRIu64 "\n", header->aux_size);
-    dr_printf("aut_offset: %" PRIu64 "\n", header->aux_offset);
+    // dr_printf("end recording %d\n", data->in_recording_sysnum);
+    // dr_printf("time_shift: %" PRIu64 "\n", header->time_shift);
+    // dr_printf("time_mult: %" PRIu64 "\n", header->time_mult);
+    // dr_printf("time_offset: %" PRIu64 "\n", header->time_offset);
+    // dr_printf("time_zero: %" PRIu64 "\n", header->time_zero);
+    // dr_printf("data_head: %" PRIu64 "\n", header->data_head);
+    // dr_printf("data_tail: %" PRIu64 "\n", header->data_tail);
+    // dr_printf("data_size: %" PRIu64 "\n", header->data_size);
+    // dr_printf("data_offset: %" PRIu64 "\n", header->data_offset);
+    // dr_printf("aux_head: %" PRIu64 "\n", header->aux_head);
+    // dr_printf("aux_tail: %" PRIu64 "\n", header->aux_tail);
+    // dr_printf("aux_size: %" PRIu64 "\n", header->aux_size);
+    // dr_printf("aut_offset: %" PRIu64 "\n", header->aux_offset);
 
     write_memory((void *)((uint8_t *)data->aux + header->aux_tail),
                  header->aux_head - header->aux_tail,
-                 &*(std::to_string(data->in_recording_syscall_id) + "_aux").begin());
-    write_memory((void *)((uint8_t *)data->data + header->data_tail),
-                 header->data_head - header->data_tail,
-                 &*(std::to_string(data->in_recording_syscall_id) + "_data").begin());
+                 &*(std::string(kernel_logsubdir) + DIRSEP +
+                    std::to_string(dr_get_thread_id(drcontext)) + "." +
+                    std::to_string(data->in_recording_syscall_id) + ".pt")
+                       .begin());
+    // write_memory((void *)((uint8_t *)data->data + header->data_tail),
+    //              header->data_head - header->data_tail,
+    //              &*(std::to_string(data->in_recording_syscall_id) + "_data").begin());
     // write_memory(
     //     data->base, (1 + (1 << 15)) * PAGE_SIZE,
     //     &*(std::to_string(data->in_recording_syscall_id) + "_base").begin());
@@ -2528,7 +2533,7 @@ event_post_syscall(void *drcontext, int sysnum)
     if (data->in_recording_syscall &&
         data->in_recording_syscall_id == data->num_syscalls &&
         sysnum == data->in_recording_sysnum) {
-        end_recording_pt(data);
+        end_recording_pt(drcontext, data);
         data->in_recording_syscall = false;
     }
 #endif
@@ -3187,6 +3192,21 @@ event_exit(void)
     drx_exit();
     /* Avoid accumulation of option values on static-link re-attach. */
     droption_parser_t::clear_values();
+    std::string shellscript =
+        "#/bin/bash \n"
+        "/usr/local/google/home/qidongzhao/bin/perf record --kcore -e "
+        "intel_pt/cyc,noretcomp/k echo '' >/dev/null 2>&1 \n"
+        "/usr/bin/chown -hR qidongzhao:primarygroup dr* \n"
+        "/usr/bin/chown -hR qidongzhao:primarygroup perf.data \n"
+        "/usr/bin/cp perf.data/kcore_dir/kcore ";
+    shellscript += kernel_logsubdir;
+    shellscript += " \n"
+        "/usr/bin/cp perf.data/kcore_dir/kallsyms ";
+    shellscript += kernel_logsubdir;
+    shellscript += " \n"
+                   "/usr/bin/chown -hR qidongzhao:primarygroup dr* \n"
+                   "/usr/bin/rm -rf perf.data \n";
+    system(shellscript.c_str());
 }
 
 static bool
@@ -3223,8 +3243,13 @@ init_offline_dir(void)
      */
     dr_snprintf(logsubdir, BUFFER_SIZE_ELEMENTS(logsubdir), "%s%s%s", buf, DIRSEP,
                 OUTFILE_SUBDIR);
+    dr_snprintf(kernel_logsubdir, BUFFER_SIZE_ELEMENTS(kernel_logsubdir), "%s%s%s", buf,
+                DIRSEP, KERNEL_OUTFILE_SUBDIR);
+
     NULL_TERMINATE_BUFFER(logsubdir);
-    if (!file_ops_func.create_dir(logsubdir))
+    NULL_TERMINATE_BUFFER(kernel_logsubdir);
+    if (!file_ops_func.create_dir(logsubdir) ||
+        !file_ops_func.create_dir(kernel_logsubdir))
         return false;
     if (has_tracing_windows())
         open_new_window_dir(tracing_window.load(std::memory_order_acquire));
