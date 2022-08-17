@@ -126,6 +126,7 @@ get_cache_simulator_knobs()
     knobs->sim_refs = op_sim_refs.get_value();
     knobs->verbose = op_verbose.get_value();
     knobs->cpu_scheduling = op_cpu_scheduling.get_value();
+    knobs->record_instr_misses = op_record_instr_misses.get_value();
     knobs->use_physical = op_use_physical.get_value();
     return knobs;
 }

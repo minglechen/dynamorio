@@ -35,8 +35,8 @@
 #include "cache_stats.h"
 
 cache_stats_t::cache_stats_t(int block_size, const std::string &miss_file,
-                             bool warmup_enabled, bool is_coherent)
-    : caching_device_stats_t(miss_file, block_size, warmup_enabled, is_coherent)
+                             bool warmup_enabled, bool is_coherent, bool record_instr_misses)
+    : caching_device_stats_t(miss_file, block_size, warmup_enabled, is_coherent, record_instr_misses)
     , num_flushes_(0)
     , num_prefetch_hits_(0)
     , num_prefetch_misses_(0)

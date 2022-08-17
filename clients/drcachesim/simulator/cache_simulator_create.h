@@ -68,6 +68,7 @@ struct cache_simulator_knobs_t {
         , sim_refs(1ULL << 63)
         , cpu_scheduling(false)
         , use_physical(false)
+        , record_instr_misses(false)
         , verbose(0)
     {
     }
@@ -89,6 +90,7 @@ struct cache_simulator_knobs_t {
     uint64_t sim_refs;
     bool cpu_scheduling;
     bool use_physical;
+    bool record_instr_misses;
     unsigned int verbose;
 };
 

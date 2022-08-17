@@ -33,12 +33,13 @@
 #include <assert.h>
 #include <iostream>
 #include <iomanip>
+#include <algorithm>
 #include "../common/options.h"
 #include "caching_device_stats.h"
 
 caching_device_stats_t::caching_device_stats_t(const std::string &miss_file,
                                                int block_size, bool warmup_enabled,
-                                               bool is_coherent)
+                                               bool is_coherent, bool record_instr_misses)
     : success_(true)
     , num_hits_(0)
     , num_misses_(0)
@@ -52,6 +53,7 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file,
     , warmup_enabled_(warmup_enabled)
     , is_coherent_(is_coherent)
     , access_count_(block_size)
+    , record_instr_access_misses_(record_instr_misses)
     , file_(nullptr)
 {
     if (miss_file.empty()) {
@@ -78,6 +80,7 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file,
     stats_map_.emplace(metric_name_t::CHILD_HITS, num_child_hits_);
     stats_map_.emplace(metric_name_t::INCLUSIVE_INVALIDATES, num_inclusive_invalidates_);
     stats_map_.emplace(metric_name_t::COHERENCE_INVALIDATES, num_coherence_invalidates_);
+
 }
 
 caching_device_stats_t::~caching_device_stats_t()
@@ -103,6 +106,11 @@ caching_device_stats_t::access(const memref_t &memref, bool hit,
         num_misses_++;
         if (dump_misses_)
             dump_miss(memref);
+
+        if (record_instr_access_misses_) {
+            if (!type_is_instr(memref.data.type))
+                ++ instr_access_hist_.access_hist[memref.data.pc];
+        }
 
         check_compulsory_miss(memref.data.addr);
     }
@@ -148,6 +156,12 @@ caching_device_stats_t::dump_miss(const memref_t &memref)
 #else
     fprintf(file_, "0x%zx,0x%zx\n", pc, addr);
 #endif
+}
+
+bool
+comp(const std::pair<addr_t, uint64_t> &l, const std::pair<addr_t, uint64_t> &r)
+{
+    return l.second > r.second;
 }
 
 void
@@ -224,6 +238,25 @@ caching_device_stats_t::print_stats(std::string prefix)
     print_rates(prefix);
     print_child_stats(prefix);
     std::cerr.imbue(std::locale("C")); // Reset to avoid affecting later prints.
+    if (record_instr_access_misses_){
+        print_miss_hist(prefix);
+    }
+}
+
+void
+caching_device_stats_t::print_miss_hist(std::string prefix, int report_top)
+{
+    std::cerr << prefix << "Top instr misses:" << std::endl;;
+        std::vector<std::pair<addr_t, uint64_t>> top(report_top);
+        std::partial_sort_copy(instr_access_hist_.access_hist.begin(), instr_access_hist_.access_hist.end(),
+                              top.begin(), top.end(), comp);
+        for (std::vector<std::pair<addr_t, uint64_t>>::iterator it = top.begin();
+            it != top.end(); ++it) {
+            std::cerr << prefix << "  " << std::setw(16) << std::hex << std::showbase << std::left << (it->first)
+                    << std::setw(20) << std::dec << std::right << it->second << std::endl;
+        }
+        // Reset the i/o format for subsequent tool invocations.
+        std::cerr << std::dec;
 }
 
 void

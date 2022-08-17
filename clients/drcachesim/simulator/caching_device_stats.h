@@ -39,6 +39,8 @@
 #include "caching_device_block.h"
 #include <string>
 #include <map>
+#include <unordered_map>
+#include <vector>
 #include <stdint.h>
 #include <limits>
 #ifdef HAS_ZLIB
@@ -153,7 +155,10 @@ class caching_device_stats_t {
 public:
     explicit caching_device_stats_t(const std::string &miss_file, int block_size,
                                     bool warmup_enabled = false,
-                                    bool is_coherent = false);
+                                    bool is_coherent = false,
+                                    bool record_instr_misses = false
+                                    );
+
     virtual ~caching_device_stats_t();
 
     // Called on each access.
@@ -209,7 +214,17 @@ protected:
     dump_miss(const memref_t &memref);
 
     void
+    print_miss_hist(std::string prefix, int report_top = 10);
+
+    void
     check_compulsory_miss(addr_t addr);
+
+    struct instr_access_hist_t {
+        std::unordered_map<addr_t, uint64_t> access_hist;
+        std::string error;
+    };
+
+    instr_access_hist_t instr_access_hist_;
 
     int_least64_t num_hits_;
     int_least64_t num_misses_;
@@ -238,6 +253,9 @@ protected:
     bool dump_misses_;
 
     access_count_t access_count_;
+    
+    bool record_instr_access_misses_;
+    
 #ifdef HAS_ZLIB
     gzFile file_;
 #else

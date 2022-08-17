@@ -203,6 +203,12 @@ droption_t<bool> op_instr_only_trace(
     "If -instr_only_trace, only instruction fetch entries are included in the "
     "trace and data entries are omitted.");
 
+droption_t<bool> op_record_instr_misses(
+    DROPTION_SCOPE_CLIENT, "record_instr_misses", false,
+    "Record top load/store instruction data misses in trace",
+    "If -record_instr_misses, instruction misses are recorded in the trace."
+    "This is useful for finding instructions that perform poorly due to data cache misses.");
+
 droption_t<bool> op_coherence(
     DROPTION_SCOPE_FRONTEND, "coherence", false, "Model coherence for private caches",
     "Writes to cache lines will invalidate other private caches that hold that line.");
