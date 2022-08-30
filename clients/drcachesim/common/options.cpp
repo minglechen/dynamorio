@@ -204,10 +204,15 @@ droption_t<bool> op_instr_only_trace(
     "trace and data entries are omitted.");
 
 droption_t<bool> op_record_instr_misses(
-    DROPTION_SCOPE_CLIENT, "record_instr_misses", false,
+    DROPTION_SCOPE_FRONTEND, "record_instr_misses", false,
     "Record top load/store instruction data misses in trace",
     "If -record_instr_misses, instruction misses are recorded in the trace."
     "This is useful for finding instructions that perform poorly due to data cache misses.");
+
+droption_t<unsigned long> op_working_set_reset_interval(
+    DROPTION_SCOPE_FRONTEND, "working_set_reset_interval", 0,
+    "Reset working set every N instructions",
+    "If non-zero, the working set is reset every N instructions.");
 
 droption_t<bool> op_coherence(
     DROPTION_SCOPE_FRONTEND, "coherence", false, "Model coherence for private caches",

@@ -76,6 +76,9 @@ public:
     void
     propagate_write(addr_t tag, const caching_device_t *requester);
 
+    void
+    flush_working_set_stats(const memref_t &memref, const int_least64_t instr_count);
+
     caching_device_stats_t *
     get_stats() const
     {

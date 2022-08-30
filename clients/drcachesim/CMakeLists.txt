@@ -97,6 +97,7 @@ endmacro ()
 
 add_exported_library(drmemtrace_reuse_distance STATIC tools/reuse_distance.cpp)
 add_exported_library(drmemtrace_histogram STATIC tools/histogram.cpp)
+add_exported_library(drmemtrace_working_set STATIC tools/working_set.cpp)
 add_exported_library(drmemtrace_reuse_time STATIC tools/reuse_time.cpp)
 add_exported_library(drmemtrace_basic_counts STATIC tools/basic_counts.cpp)
 add_exported_library(drmemtrace_opcode_mix STATIC tools/opcode_mix.cpp)
@@ -178,7 +179,7 @@ add_executable(drcachesim ${drcachesim_srcs})
 configure_DynamoRIO_standalone(drcachesim)
 # Link in our tools:
 target_link_libraries(drcachesim drmemtrace_simulator drmemtrace_reuse_distance
-  drmemtrace_histogram drmemtrace_reuse_time drmemtrace_basic_counts
+  drmemtrace_histogram drmemtrace_working_set drmemtrace_reuse_time drmemtrace_basic_counts
   drmemtrace_opcode_mix drmemtrace_view drmemtrace_func_view
   drmemtrace_raw2trace directory_iterator)
 if (libsnappy)
@@ -226,6 +227,7 @@ install_client_nonDR_header(drmemtrace tools/histogram_create.h)
 install_client_nonDR_header(drmemtrace tools/reuse_time_create.h)
 install_client_nonDR_header(drmemtrace tools/basic_counts_create.h)
 install_client_nonDR_header(drmemtrace tools/opcode_mix_create.h)
+install_client_nonDR_header(drmemtrace tools/working_set_create.h)
 install_client_nonDR_header(drmemtrace simulator/cache_simulator.h)
 install_client_nonDR_header(drmemtrace simulator/cache_simulator_create.h)
 install_client_nonDR_header(drmemtrace simulator/tlb_simulator_create.h)
@@ -386,6 +388,7 @@ endif ()
 restore_nonclient_flags(drmemtrace_simulator)
 restore_nonclient_flags(drmemtrace_reuse_distance)
 restore_nonclient_flags(drmemtrace_histogram)
+restore_nonclient_flags(drmemtrace_working_set)
 restore_nonclient_flags(drmemtrace_reuse_time)
 restore_nonclient_flags(drmemtrace_basic_counts)
 restore_nonclient_flags(drmemtrace_opcode_mix)

@@ -48,6 +48,7 @@
 #include "../tools/view_create.h"
 #include "../tools/func_view_create.h"
 #include "../tools/invariant_checker_create.h"
+#include "../tools/working_set_create.h"
 #include "../tracer/raw2trace.h"
 #include "../tracer/raw2trace_directory.h"
 #include <fstream>
@@ -127,6 +128,7 @@ get_cache_simulator_knobs()
     knobs->verbose = op_verbose.get_value();
     knobs->cpu_scheduling = op_cpu_scheduling.get_value();
     knobs->record_instr_misses = op_record_instr_misses.get_value();
+    knobs->working_set_reset_interval = op_working_set_reset_interval.get_value();
     knobs->use_physical = op_use_physical.get_value();
     return knobs;
 }
@@ -183,6 +185,8 @@ drmemtrace_analysis_tool_create()
         return reuse_time_tool_create(op_line_size.get_value(), op_verbose.get_value());
     } else if (op_simulator_type.get_value() == BASIC_COUNTS) {
         return basic_counts_tool_create(op_verbose.get_value());
+    } else if (op_simulator_type.get_value() == WORKING_SET) {
+        return working_set_tool_create(op_line_size.get_value(), op_working_set_reset_interval.get_value(), op_verbose.get_value());
     } else if (op_simulator_type.get_value() == OPCODE_MIX) {
         std::string module_file_path = get_module_file_path();
         if (module_file_path.empty()) {
@@ -213,7 +217,8 @@ drmemtrace_analysis_tool_create()
         ERRMSG("Usage error: unsupported analyzer type. "
                "Please choose " CPU_CACHE ", " MISS_ANALYZER ", " TLB ", " HISTOGRAM
                ", " REUSE_DIST ", " BASIC_COUNTS ", " OPCODE_MIX ", " VIEW
-               " or " FUNC_VIEW ".\n");
+               ", " WORKING_SET " or " FUNC_VIEW ".\n");
+
         return nullptr;
     }
 }

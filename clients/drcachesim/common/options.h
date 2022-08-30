@@ -52,6 +52,7 @@
 #define VIEW "view"
 #define FUNC_VIEW "func_view"
 #define INVARIANT_CHECKER "invariant_checker"
+#define WORKING_SET "working_set"
 #define CACHE_TYPE_INSTRUCTION "instruction"
 #define CACHE_TYPE_DATA "data"
 #define CACHE_TYPE_UNIFIED "unified"
@@ -85,6 +86,7 @@ extern droption_t<bool> op_L0D_filter;
 extern droption_t<bytesize_t> op_L0D_size;
 extern droption_t<bool> op_instr_only_trace;
 extern droption_t<bool> op_record_instr_misses;
+extern droption_t<unsigned long> op_working_set_reset_interval;
 extern droption_t<bool> op_coherence;
 extern droption_t<bool> op_use_physical;
 extern droption_t<unsigned int> op_virt2phys_freq;

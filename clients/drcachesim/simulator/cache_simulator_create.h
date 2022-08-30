@@ -69,6 +69,7 @@ struct cache_simulator_knobs_t {
         , cpu_scheduling(false)
         , use_physical(false)
         , record_instr_misses(false)
+        , working_set_reset_interval(0)
         , verbose(0)
     {
     }
@@ -91,6 +92,7 @@ struct cache_simulator_knobs_t {
     bool cpu_scheduling;
     bool use_physical;
     bool record_instr_misses;
+    uint64_t working_set_reset_interval;
     unsigned int verbose;
 };
 

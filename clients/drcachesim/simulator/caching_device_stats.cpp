@@ -39,11 +39,12 @@
 
 caching_device_stats_t::caching_device_stats_t(const std::string &miss_file,
                                                int block_size, bool warmup_enabled,
-                                               bool is_coherent, bool record_instr_misses)
+                                               bool is_coherent, bool record_instr_misses, bool record_working_set)
     : success_(true)
     , num_hits_(0)
     , num_misses_(0)
     , num_compulsory_misses_(0)
+    , num_working_set_misses_(0)
     , num_child_hits_(0)
     , num_inclusive_invalidates_(0)
     , num_coherence_invalidates_(0)
@@ -53,7 +54,9 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file,
     , warmup_enabled_(warmup_enabled)
     , is_coherent_(is_coherent)
     , access_count_(block_size)
+    , working_set_access_count_(block_size)
     , record_instr_access_misses_(record_instr_misses)
+    , record_working_set_(record_working_set)
     , file_(nullptr)
 {
     if (miss_file.empty()) {
@@ -114,6 +117,7 @@ caching_device_stats_t::access(const memref_t &memref, bool hit,
 
         check_compulsory_miss(memref.data.addr);
     }
+    check_working_set(memref.data.addr);
 }
 
 void
@@ -136,6 +140,27 @@ caching_device_stats_t::check_compulsory_miss(addr_t addr)
         num_compulsory_misses_++;
         access_count_.insert(addr, lookup_pair.second);
     }
+}
+
+void
+caching_device_stats_t::check_working_set(addr_t addr)
+{
+    auto lookup_pair = working_set_access_count_.lookup(addr);
+
+    if (!lookup_pair.first) {
+        num_working_set_misses_++;
+        working_set_access_count_.insert(addr, lookup_pair.second);
+    }
+}
+
+void
+caching_device_stats_t::flush_working_set(const memref_t &memref, const int_least64_t instr_count)
+{
+    if (working_set_hist_.count(instr_count))
+        return;
+    working_set_hist_[instr_count] = num_working_set_misses_;
+    working_set_access_count_.clear();
+    num_working_set_misses_ = 0;
 }
 
 void
@@ -228,7 +253,7 @@ caching_device_stats_t::print_child_stats(std::string prefix)
 }
 
 void
-caching_device_stats_t::print_stats(std::string prefix)
+caching_device_stats_t::print_stats(std::string prefix, const int_least64_t instr_count)
 {
     std::cerr.imbue(std::locale("")); // Add commas, at least for my locale
     if (warmup_enabled_) {
@@ -240,6 +265,9 @@ caching_device_stats_t::print_stats(std::string prefix)
     std::cerr.imbue(std::locale("C")); // Reset to avoid affecting later prints.
     if (record_instr_access_misses_){
         print_miss_hist(prefix);
+    }
+    if (record_working_set_){
+        print_working_set(prefix, instr_count);
     }
 }
 
@@ -253,10 +281,23 @@ caching_device_stats_t::print_miss_hist(std::string prefix, int report_top)
         for (std::vector<std::pair<addr_t, uint64_t>>::iterator it = top.begin();
             it != top.end(); ++it) {
             std::cerr << prefix << "  " << std::setw(16) << std::hex << std::showbase << std::left << (it->first)
-                    << std::setw(20) << std::dec << std::right << it->second << std::endl;
+                    << std::setw(18) << std::dec << std::right << it->second << std::endl;
         }
         // Reset the i/o format for subsequent tool invocations.
         std::cerr << std::dec;
+}
+
+void
+caching_device_stats_t::print_working_set(std::string prefix, const int_least64_t instr_count)
+{
+    if (!working_set_hist_.count(instr_count)){
+        working_set_hist_[instr_count] = num_working_set_misses_;
+    }
+    std::cerr << prefix << "Working set:" << std::endl;
+    for (auto it = working_set_hist_.begin(); it != working_set_hist_.end(); ++it) {
+        std::cerr << prefix << "  " << std::setw(16) << std::left << (it->first)
+                  << std::setw(18)<< std::right << it->second << std::endl;
+    }
 }
 
 void

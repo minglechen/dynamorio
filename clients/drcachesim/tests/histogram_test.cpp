@@ -49,7 +49,7 @@ bool
 check_cross_line()
 {
     static constexpr unsigned int LINE_SIZE = 64;
-    histogram_t tool(LINE_SIZE, 0, 0);
+    working_set_t tool(LINE_SIZE, 0, 0);
     std::vector<memref_t> memrefs = {
         gen_instr(1, 20 * LINE_SIZE),
         gen_data(1, /*load=*/true, 10 * LINE_SIZE, 8),
