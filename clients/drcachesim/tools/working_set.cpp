@@ -48,8 +48,10 @@ bool
 working_set_t::process_memref(const memref_t &memref)
 {
     // similar to how histogram is handled, except we need to be single threaded for instruction count
-    instruction_count_++;
-    num_working_set_count_++;
+    if (type_is_instr(memref.instr.type)) {
+        instruction_count_++;
+        num_working_set_count_++;
+    }
     std::unordered_map<addr_t, uint64_t> *cache_map = nullptr;
     addr_t start_addr;
     size_t size;
