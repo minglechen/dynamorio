@@ -38,6 +38,8 @@
 
 #include "caching_device_block.h"
 #include <string>
+#include <iterator>
+#include <fstream>
 #include <map>
 #include <unordered_map>
 #include <vector>
@@ -157,9 +159,45 @@ private:
     int block_size_;
 };
 
+// https://stackoverflow.com/questions/1120140/how-can-i-read-and-parse-csv-files-in-c
+
+class csv_row_t
+{
+    public:
+        std::string operator[](std::size_t index) const
+        {
+            return std::string(&m_line[m_data[index] + 1], m_data[index + 1] -  (m_data[index] + 1));
+        }
+        std::size_t size() const
+        {
+            return m_data.size() - 1;
+        }
+        void readNextRow(std::istream& str)
+        {
+            std::getline(str, m_line);
+
+            m_data.clear();
+            m_data.emplace_back(-1);
+            std::string::size_type pos = 0;
+            while((pos = m_line.find(',', pos)) != std::string::npos)
+            {
+                m_data.emplace_back(pos);
+                ++pos;
+            }
+            // This checks for a trailing comma with no data after it.
+            pos   = m_line.size();
+            m_data.emplace_back(pos);
+        }
+    private:
+        std::string         m_line;
+        std::vector<int>    m_data;
+};
+
+
 class caching_device_stats_t {
 public:
-    explicit caching_device_stats_t(const std::string &miss_file, int block_size,
+    explicit caching_device_stats_t(const std::string &miss_file, const std::string &addr2line_file,
+                                    int block_size,
                                     bool warmup_enabled = false,
                                     bool is_coherent = false,
                                     bool record_instr_misses = false,
@@ -224,7 +262,7 @@ protected:
     dump_miss(const memref_t &memref);
 
     void
-    print_miss_hist(std::string prefix, int report_top = 10);
+    print_miss_hist(std::string prefix, int report_top = 10, bool map_to_line = false);
 
     void
     print_working_set(std::string prefix, const int_least64_t instr_count);
@@ -235,9 +273,18 @@ protected:
     void
     check_working_set(addr_t addr);
 
+    void
+    read_csv(const std::string &file_name);
+
     struct instr_access_hist_t {
         std::unordered_map<addr_t, int_least64_t> access_hist;
         std::string error;
+    };
+
+    struct debug_info_t {
+        std::string symbol;
+        std::string path;
+        int line;
     };
 
     instr_access_hist_t instr_access_hist_;
@@ -274,10 +321,14 @@ protected:
     access_count_t working_set_access_count_;
 
     std::map<int_least64_t, int_least64_t> working_set_hist_;
+
+    std::unordered_map<addr_t, debug_info_t*> addr2line_map_;
     
     bool record_instr_access_misses_;
 
     bool record_working_set_;
+
+    const std::string addr2line_file_;
     
 #ifdef HAS_ZLIB
     gzFile file_;

@@ -37,7 +37,7 @@
 #include "../common/options.h"
 #include "caching_device_stats.h"
 
-caching_device_stats_t::caching_device_stats_t(const std::string &miss_file,
+caching_device_stats_t::caching_device_stats_t(const std::string &miss_file, const std::string &addr2line_file,
                                                int block_size, bool warmup_enabled,
                                                bool is_coherent, bool record_instr_misses, bool record_working_set)
     : success_(true)
@@ -57,6 +57,7 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file,
     , working_set_access_count_(block_size)
     , record_instr_access_misses_(record_instr_misses)
     , record_working_set_(record_working_set)
+    , addr2line_file_(addr2line_file)
     , file_(nullptr)
 {
     if (miss_file.empty()) {
@@ -94,6 +95,9 @@ caching_device_stats_t::~caching_device_stats_t()
 #else
         fclose(file_);
 #endif
+    }
+    for (auto &it : addr2line_map_) {
+        delete it.second;
     }
 }
 
@@ -190,6 +194,42 @@ comp(const std::pair<addr_t, uint64_t> &l, const std::pair<addr_t, uint64_t> &r)
 }
 
 void
+caching_device_stats_t::read_csv(const std::string &file_name)
+{
+    std::ifstream file(file_name);
+    csv_row_t row;
+    int addr_index = -1;
+    int symbol_index = -1;
+    int path_index = -1;
+    int line_index = -1;
+    row.readNextRow(file);
+    for (size_t i = 0; i < row.size(); i++) {
+        if (row[i] == "addr")
+            addr_index = i;
+        if (row[i] == "symbol")
+            symbol_index = i;
+        if (row[i] == "path")
+            path_index = i;
+        if (row[i] == "line")
+            line_index = i;
+    }
+    if (addr_index == -1 || symbol_index == -1 || path_index == -1 || line_index == -1) {
+        ERRMSG("CSV file does not contain all required columns");
+        file.close();
+        return;
+    }
+    do {
+        debug_info_t* debug_info = new debug_info_t();
+        debug_info->symbol = row[symbol_index];
+        debug_info->path = row[path_index];
+        debug_info->line = std::stoi(row[line_index]);
+        addr2line_map_.emplace(reinterpret_cast<addr_t>(std::stoul(row[addr_index])), debug_info);
+        row.readNextRow(file);
+    } while (!file.eof());
+    file.close();
+}
+
+void
 caching_device_stats_t::print_warmup(std::string prefix)
 {
     std::cerr << prefix << std::setw(18) << std::left << "Warmup hits:" << std::setw(20)
@@ -272,8 +312,16 @@ caching_device_stats_t::print_stats(std::string prefix, const int_least64_t inst
 }
 
 void
-caching_device_stats_t::print_miss_hist(std::string prefix, int report_top)
+caching_device_stats_t::print_miss_hist(std::string prefix, int report_top, bool map_to_line)
 {
+    if (map_to_line){
+        if (addr2line_file_.empty()){
+            ERRMSG("No addr2line_file specified, cannot map addresses to lines");
+            map_to_line = false;
+        } else {
+            read_csv(addr2line_file_);
+        }
+    }
     std::cerr << prefix << "Top instr misses:" << std::endl;;
         std::vector<std::pair<addr_t, uint64_t>> top(report_top);
         std::partial_sort_copy(instr_access_hist_.access_hist.begin(), instr_access_hist_.access_hist.end(),
@@ -282,6 +330,9 @@ caching_device_stats_t::print_miss_hist(std::string prefix, int report_top)
             it != top.end(); ++it) {
             std::cerr << prefix << "  " << std::setw(16) << std::hex << std::showbase << std::left << (it->first)
                     << std::setw(18) << std::dec << std::right << it->second << std::endl;
+            if (map_to_line){
+                    std::cerr << prefix << "    " << addr2line_map_[it->first]->line << std::endl;
+            }
         }
         // Reset the i/o format for subsequent tool invocations.
         std::cerr << std::dec;
