@@ -75,6 +75,12 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file, con
             dump_misses_ = true;
     }
 
+    if (addr2line_file_.empty()) {
+        map_to_line_ = false;
+    } else {
+        map_to_line_ = true;
+    }
+
     stats_map_.emplace(metric_name_t::HITS, num_hits_);
     stats_map_.emplace(metric_name_t::MISSES, num_misses_);
     stats_map_.emplace(metric_name_t::HITS_AT_RESET, num_hits_at_reset_);
@@ -193,10 +199,14 @@ comp(const std::pair<addr_t, uint64_t> &l, const std::pair<addr_t, uint64_t> &r)
     return l.second > r.second;
 }
 
-void
+bool
 caching_device_stats_t::read_csv(const std::string &file_name)
 {
     std::ifstream file(file_name);
+    if (!file.good()) {
+        ERRMSG("Could not open file %s", file_name.c_str());
+        return false;
+    }
     csv_row_t row;
     int addr_index = -1;
     int symbol_index = -1;
@@ -216,17 +226,19 @@ caching_device_stats_t::read_csv(const std::string &file_name)
     if (addr_index == -1 || symbol_index == -1 || path_index == -1 || line_index == -1) {
         ERRMSG("CSV file does not contain all required columns");
         file.close();
-        return;
+        return false;
     }
-    do {
+    row.readNextRow(file);
+    while (!file.eof()) {
         debug_info_t* debug_info = new debug_info_t();
         debug_info->symbol = row[symbol_index];
         debug_info->path = row[path_index];
         debug_info->line = std::stoi(row[line_index]);
         addr2line_map_.emplace(reinterpret_cast<addr_t>(std::stoul(row[addr_index])), debug_info);
         row.readNextRow(file);
-    } while (!file.eof());
+    };
     file.close();
+    return true;
 }
 
 void
@@ -312,14 +324,11 @@ caching_device_stats_t::print_stats(std::string prefix, const int_least64_t inst
 }
 
 void
-caching_device_stats_t::print_miss_hist(std::string prefix, int report_top, bool map_to_line)
+caching_device_stats_t::print_miss_hist(std::string prefix, int report_top)
 {
-    if (map_to_line){
-        if (addr2line_file_.empty()){
-            ERRMSG("No addr2line_file specified, cannot map addresses to lines");
-            map_to_line = false;
-        } else {
-            read_csv(addr2line_file_);
+    if (map_to_line_){
+        if(!read_csv(addr2line_file_)){
+            map_to_line_ = false;
         }
     }
     std::cerr << prefix << "Top instr misses:" << std::endl;;
@@ -330,8 +339,11 @@ caching_device_stats_t::print_miss_hist(std::string prefix, int report_top, bool
             it != top.end(); ++it) {
             std::cerr << prefix << "  " << std::setw(16) << std::hex << std::showbase << std::left << (it->first)
                     << std::setw(18) << std::dec << std::right << it->second << std::endl;
-            if (map_to_line){
-                    std::cerr << prefix << "    " << addr2line_map_[it->first]->line << std::endl;
+            if (map_to_line_){
+                auto it2 = addr2line_map_.find(it->first);
+                if (it2 != addr2line_map_.end()){
+                    std::cerr << prefix << "    " << it2->second->path << ":" << it2->second->line << " " << it2->second->symbol << std::endl;
+                }
             }
         }
         // Reset the i/o format for subsequent tool invocations.

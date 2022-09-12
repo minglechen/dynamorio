@@ -262,7 +262,7 @@ protected:
     dump_miss(const memref_t &memref);
 
     void
-    print_miss_hist(std::string prefix, int report_top = 10, bool map_to_line = false);
+    print_miss_hist(std::string prefix, int report_top = 10);
 
     void
     print_working_set(std::string prefix, const int_least64_t instr_count);
@@ -273,7 +273,7 @@ protected:
     void
     check_working_set(addr_t addr);
 
-    void
+    bool
     read_csv(const std::string &file_name);
 
     struct instr_access_hist_t {
@@ -327,6 +327,8 @@ protected:
     bool record_instr_access_misses_;
 
     bool record_working_set_;
+
+    bool map_to_line_;
 
     const std::string addr2line_file_;
     

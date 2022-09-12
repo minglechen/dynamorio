@@ -59,6 +59,7 @@ struct cache_simulator_knobs_t {
         , LL_size(8 * 1024 * 1024)
         , LL_assoc(16)
         , LL_miss_file("")
+        , addr2line_file("")
         , model_coherence(false)
         , replace_policy("LRU")
         , data_prefetcher("nextline")
@@ -82,6 +83,7 @@ struct cache_simulator_knobs_t {
     uint64_t LL_size;
     unsigned int LL_assoc;
     std::string LL_miss_file;
+    std::string addr2line_file;
     bool model_coherence;
     std::string replace_policy;
     std::string data_prefetcher;

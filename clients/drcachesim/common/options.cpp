@@ -159,6 +159,12 @@ droption_t<std::string> op_LL_miss_file(
     "analysis be written to the specified file. Each hint is written in text format as a "
     "<program counter, stride, locality level> tuple.");
 
+droption_t<std::string> op_addr2line_file(
+    DROPTION_SCOPE_FRONTEND, "addr2line_file", "",
+    "Path to addr2line csv for cache miss analysis",
+    "The cache simulator needs the addr2line csv to translate addresses to "
+    "source code locations.");
+
 droption_t<bool> op_L0_filter_deprecated(
     DROPTION_SCOPE_CLIENT, "L0_filter", false,
     "Filter out first-level instruction and data cache hits during tracing",
@@ -395,11 +401,11 @@ droption_t<std::string>
     op_simulator_type(DROPTION_SCOPE_FRONTEND, "simulator_type", CPU_CACHE,
                       "Simulator type (" CPU_CACHE ", " MISS_ANALYZER ", " TLB
                       ", " REUSE_DIST ", " REUSE_TIME ", " HISTOGRAM ", " VIEW
-                      ", " FUNC_VIEW ", " BASIC_COUNTS ", or " INVARIANT_CHECKER ").",
+                      ", " FUNC_VIEW ", " BASIC_COUNTS ", " WORKING_SET ", or " INVARIANT_CHECKER ").",
                       "Specifies the type of the simulator. "
                       "Supported types: " CPU_CACHE ", " MISS_ANALYZER ", " TLB
                       ", " REUSE_DIST ", " REUSE_TIME ", " HISTOGRAM ", " BASIC_COUNTS
-                      ", or " INVARIANT_CHECKER ".");
+                      ", " WORKING_SET ", or " INVARIANT_CHECKER ".");
 
 droption_t<unsigned int> op_verbose(DROPTION_SCOPE_ALL, "verbose", 0, 0, 64,
                                     "Verbosity level",

@@ -110,7 +110,7 @@ cache_simulator_t::cache_simulator_t(const cache_simulator_knobs_t &knobs)
     bool warmup_enabled_ = ((knobs_.warmup_refs > 0) || (knobs_.warmup_fraction > 0.0));
 
     if (!llc->init(knobs_.LL_assoc, (int)knobs_.line_size, (int)knobs_.LL_size, NULL,
-                   new cache_stats_t((int)knobs_.line_size, knobs_.LL_miss_file,
+                   new cache_stats_t((int)knobs_.line_size, knobs_.LL_miss_file, knobs_.addr2line_file,
                                      warmup_enabled_, false, knobs_.record_instr_misses, record_working_set_))) {
         error_string_ =
             "Usage error: failed to initialize LL cache.  Ensure sizes and "
@@ -146,13 +146,13 @@ cache_simulator_t::cache_simulator_t(const cache_simulator_knobs_t &knobs)
 
         if (!l1_icaches_[i]->init(
                 knobs_.L1I_assoc, (int)knobs_.line_size, (int)knobs_.L1I_size, llc,
-                new cache_stats_t((int)knobs_.line_size, "", warmup_enabled_,
+                new cache_stats_t((int)knobs_.line_size, "", knobs.addr2line_file, warmup_enabled_,
                                   knobs_.model_coherence, false, record_working_set_),
                 nullptr /*prefetcher*/, false /*inclusive*/, knobs_.model_coherence,
                 2 * i, snoop_filter_) ||
             !l1_dcaches_[i]->init(
                 knobs_.L1D_assoc, (int)knobs_.line_size, (int)knobs_.L1D_size, llc,
-                new cache_stats_t((int)knobs_.line_size, "", warmup_enabled_,
+                new cache_stats_t((int)knobs_.line_size, "", knobs.addr2line_file, warmup_enabled_,
                                   knobs_.model_coherence, knobs_.record_instr_misses, record_working_set_),
                 knobs_.data_prefetcher == PREFETCH_POLICY_NEXTLINE
                     ? new prefetcher_t((int)knobs_.line_size)
@@ -325,7 +325,7 @@ cache_simulator_t::cache_simulator_t(std::istream *config_file)
 
         if (!cache->init((int)cache_config.assoc, (int)knobs_.line_size,
                          (int)cache_config.size, parent_,
-                         new cache_stats_t((int)knobs_.line_size, cache_config.miss_file,
+                         new cache_stats_t((int)knobs_.line_size, cache_config.miss_file, "",
                                            warmup_enabled_, is_coherent_, knobs_.record_instr_misses, record_working_set_),
                          cache_config.prefetcher == PREFETCH_POLICY_NEXTLINE
                              ? new prefetcher_t((int)knobs_.line_size)
