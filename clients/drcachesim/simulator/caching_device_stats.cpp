@@ -331,7 +331,7 @@ caching_device_stats_t::print_miss_hist(std::string prefix, int report_top)
             map_to_line_ = false;
         }
     }
-    std::cerr << prefix << "Top instr misses:" << std::endl;;
+    std::cerr << prefix << "Top data instr misses:" << std::endl;;
         std::vector<std::pair<addr_t, uint64_t>> top(report_top);
         std::partial_sort_copy(instr_access_hist_.access_hist.begin(), instr_access_hist_.access_hist.end(),
                               top.begin(), top.end(), comp);
