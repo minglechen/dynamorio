@@ -182,7 +182,15 @@ class csv_row_t
             while((pos = m_line.find(',', pos)) != std::string::npos)
             {
                 m_data.emplace_back(pos);
-                ++pos;
+                //check for double quotes
+                if (m_line.size() > pos + 1 && m_line[pos + 1] == '"') {
+                    pos = m_line.find("\",", pos + 2);
+                    if (pos == std::string::npos) {
+                        break;
+                    }
+                } else {
+                    pos++;
+                }
             }
             // This checks for a trailing comma with no data after it.
             pos   = m_line.size();
