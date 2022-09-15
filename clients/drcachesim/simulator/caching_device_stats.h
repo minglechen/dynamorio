@@ -145,12 +145,6 @@ public:
         }
     }
 
-    // Clear all recorded accesses.
-    void clear()
-    {
-        bounds.clear();
-    }
-
 private:
     // Bounds are members of the std::map. The beginning of the bound is stored
     // as a key and the end as a value.
@@ -208,8 +202,7 @@ public:
                                     int block_size,
                                     bool warmup_enabled = false,
                                     bool is_coherent = false,
-                                    bool record_instr_misses = false,
-                                    bool record_working_set = false
+                                    bool record_instr_misses = false
                                     );
 
     virtual ~caching_device_stats_t();
@@ -220,15 +213,12 @@ public:
     virtual void
     access(const memref_t &memref, bool hit, caching_device_block_t *cache_block);
 
-    virtual void
-    flush_working_set(const memref_t &memref, int_least64_t instr_count);
-
     // Called on each access by a child caching device.
     virtual void
     child_access(const memref_t &memref, bool hit, caching_device_block_t *cache_block);
 
     virtual void
-    print_stats(std::string prefix, const int_least64_t instr_count = 0);
+    print_stats(std::string prefix);
 
     virtual void
     reset();
@@ -273,13 +263,7 @@ protected:
     print_miss_hist(std::string prefix, int report_top = 10);
 
     void
-    print_working_set(std::string prefix, const int_least64_t instr_count);
-
-    void
     check_compulsory_miss(addr_t addr);
-
-    void
-    check_working_set(addr_t addr);
 
     bool
     read_csv(const std::string &file_name);
@@ -326,15 +310,9 @@ protected:
 
     access_count_t access_count_;
 
-    access_count_t working_set_access_count_;
-
-    std::map<int_least64_t, int_least64_t> working_set_hist_;
-
     std::unordered_map<addr_t, debug_info_t*> addr2line_map_;
     
     bool record_instr_access_misses_;
-
-    bool record_working_set_;
 
     bool map_to_line_;
 

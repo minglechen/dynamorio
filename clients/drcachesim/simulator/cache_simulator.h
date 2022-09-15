@@ -94,10 +94,6 @@ protected:
 
     cache_simulator_knobs_t knobs_;
 
-    int_least64_t instr_count_;
-    int_least64_t working_set_reset_interval_;
-    int_least64_t working_set_reset_counter_;
-    bool record_working_set_;
     // Implement a set of ICaches and DCaches with pointer arrays.
     // This is useful for implementing polymorphism correctly.
     cache_t **l1_icaches_;

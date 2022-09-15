@@ -393,9 +393,3 @@ caching_device_t::record_access_stats(const memref_t &memref, bool hit,
     } else if (parent_ != nullptr)
         parent_->stats_->child_access(memref, hit, cache_block);
 }
-
-void
-caching_device_t::flush_working_set_stats(const memref_t &memref, const int_least64_t instr_count)
-{
-    stats_->flush_working_set(memref, instr_count);
-}

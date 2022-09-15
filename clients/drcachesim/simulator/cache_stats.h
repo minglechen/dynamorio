@@ -42,7 +42,7 @@
 class cache_stats_t : public caching_device_stats_t {
 public:
     explicit cache_stats_t(int block_size, const std::string &miss_file = "", const std::string &addr2line_file = "",
-                           bool warmup_enabled = false, bool is_coherent = false, bool record_instr_misses = false, bool record_working_set = false);
+                           bool warmup_enabled = false, bool is_coherent = false, bool record_instr_misses = false);
 
     // In addition to caching_device_stats_t::access,
     // cache_stats_t::access processes prefetching requests.
