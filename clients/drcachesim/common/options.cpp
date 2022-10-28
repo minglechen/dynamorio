@@ -165,6 +165,13 @@ droption_t<std::string> op_addr2line_file(
     "The cache simulator needs the addr2line csv to translate addresses to "
     "source code locations.");
 
+droption_t<std::string> op_output_file(
+    DROPTION_SCOPE_FRONTEND, "output_file", "",
+    "Path for dumping instruction address count to source code mappings. ",
+    "If non-empty, when running the cache simulator, requests that "
+    "the results be written to a file at the specified path. The file "
+    "is written in csv format. ");
+
 droption_t<bool> op_L0_filter_deprecated(
     DROPTION_SCOPE_CLIENT, "L0_filter", false,
     "Filter out first-level instruction and data cache hits during tracing",

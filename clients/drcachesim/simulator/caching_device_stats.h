@@ -199,6 +199,7 @@ class csv_row_t
 class caching_device_stats_t {
 public:
     explicit caching_device_stats_t(const std::string &miss_file, const std::string &addr2line_file,
+                                    const std::string &output_file,
                                     int block_size,
                                     bool warmup_enabled = false,
                                     bool is_coherent = false,
@@ -263,6 +264,9 @@ protected:
     print_miss_hist(std::string prefix, int report_top = 10);
 
     void
+    write_instr_info_file();
+
+    void
     check_compulsory_miss(addr_t addr);
 
     bool
@@ -316,7 +320,11 @@ protected:
 
     bool map_to_line_;
 
+    bool write_instr_info_file_;
+
     const std::string addr2line_file_;
+
+    const std::string output_file_;
     
 #ifdef HAS_ZLIB
     gzFile file_;

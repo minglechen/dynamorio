@@ -38,7 +38,7 @@
 #include "caching_device_stats.h"
 
 caching_device_stats_t::caching_device_stats_t(const std::string &miss_file, const std::string &addr2line_file,
-                                               int block_size, bool warmup_enabled,
+                                               const std::string &output_file, int block_size, bool warmup_enabled,
                                                bool is_coherent, bool record_instr_misses)
     : success_(true)
     , num_hits_(0)
@@ -56,6 +56,7 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file, con
     , access_count_(block_size)
     , record_instr_access_misses_(record_instr_misses)
     , addr2line_file_(addr2line_file)
+    , output_file_(output_file)
     , file_(nullptr)
 {
     if (miss_file.empty()) {
@@ -77,6 +78,12 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file, con
         map_to_line_ = false;
     } else {
         map_to_line_ = true;
+    }
+
+    if (output_file_.empty()) {
+        write_instr_info_file_ = false;
+    } else {    
+        write_instr_info_file_ = true;
     }
 
     stats_map_.emplace(metric_name_t::HITS, num_hits_);
@@ -293,7 +300,39 @@ caching_device_stats_t::print_stats(std::string prefix)
     std::cerr.imbue(std::locale("C")); // Reset to avoid affecting later prints.
     if (record_instr_access_misses_){
         print_miss_hist(prefix);
+        if (write_instr_info_file_) {
+            write_instr_info_file();
+        }
     }
+}
+
+void
+caching_device_stats_t::write_instr_info_file()
+{
+    if (!map_to_line_) {
+        return;
+    }
+    std::ofstream file;
+    file.open(output_file_);
+    if (!file.good()) {
+        ERRMSG("Could not open file %s", output_file_.c_str());
+        return;
+    }
+    file << "addr,count,path,line,symbol" << std::endl;
+
+    auto top = instr_access_hist_.access_hist;
+
+    for (auto it = top.begin();
+        it != top.end(); ++it) {
+        file << (it->first) << "," << (it->second) << ",";
+        auto it2 = addr2line_map_.find(it->first);
+        if (it2 != addr2line_map_.end()){
+            file << it2->second->path << "," << it2->second->line << "," << it2->second->symbol << std::endl;
+        } else {
+            file << "unknown,0,unknown" << std::endl;
+        }
+    }
+    file.close();
 }
 
 void

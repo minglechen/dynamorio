@@ -41,7 +41,7 @@
 class tlb_stats_t : public caching_device_stats_t {
 public:
     tlb_stats_t(int block_size)
-        : caching_device_stats_t("", "", block_size)
+        : caching_device_stats_t("", "", "", block_size)
     {
     }
     // XXX: support page privilege and MMU-related exceptions

@@ -119,6 +119,7 @@ get_cache_simulator_knobs()
     knobs->LL_assoc = op_LL_assoc.get_value();
     knobs->LL_miss_file = op_LL_miss_file.get_value();
     knobs->addr2line_file = op_addr2line_file.get_value();
+    knobs->output_file = op_output_file.get_value();
     knobs->model_coherence = op_coherence.get_value();
     knobs->replace_policy = op_replace_policy.get_value();
     knobs->data_prefetcher = op_data_prefetcher.get_value();
