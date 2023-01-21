@@ -49,6 +49,7 @@
 #include "../tools/func_view_create.h"
 #include "../tools/invariant_checker_create.h"
 #include "../tools/working_set_create.h"
+#include "../tools/instr_count_create.h"
 #include "../tracer/raw2trace.h"
 #include "../tracer/raw2trace_directory.h"
 #include <fstream>
@@ -119,7 +120,7 @@ get_cache_simulator_knobs()
     knobs->LL_assoc = op_LL_assoc.get_value();
     knobs->LL_miss_file = op_LL_miss_file.get_value();
     knobs->addr2line_file = op_addr2line_file.get_value();
-    knobs->output_file = op_output_file.get_value();
+    knobs->output_dir = op_output_dir.get_value();
     knobs->model_coherence = op_coherence.get_value();
     knobs->replace_policy = op_replace_policy.get_value();
     knobs->data_prefetcher = op_data_prefetcher.get_value();
@@ -130,7 +131,6 @@ get_cache_simulator_knobs()
     knobs->verbose = op_verbose.get_value();
     knobs->cpu_scheduling = op_cpu_scheduling.get_value();
     knobs->record_instr_misses = op_record_instr_misses.get_value();
-    knobs->working_set_reset_interval = op_working_set_reset_interval.get_value();
     knobs->use_physical = op_use_physical.get_value();
     return knobs;
 }
@@ -188,7 +188,13 @@ drmemtrace_analysis_tool_create()
     } else if (op_simulator_type.get_value() == BASIC_COUNTS) {
         return basic_counts_tool_create(op_verbose.get_value());
     } else if (op_simulator_type.get_value() == WORKING_SET) {
-        return working_set_tool_create(op_line_size.get_value(), op_working_set_reset_interval.get_value(), op_verbose.get_value());
+        return working_set_tool_create(op_line_size.get_value(),
+                                       op_working_set_reset_interval.get_value(),
+                                       op_verbose.get_value());
+    } else if (op_simulator_type.get_value() == INSTR_COUNT) {
+        return instr_count_tool_create(op_addr2line_file.get_value(),
+                                       op_output_dir.get_value(),
+                                       op_report_top.get_value(), op_verbose.get_value());
     } else if (op_simulator_type.get_value() == OPCODE_MIX) {
         std::string module_file_path = get_module_file_path();
         if (module_file_path.empty()) {
@@ -219,7 +225,7 @@ drmemtrace_analysis_tool_create()
         ERRMSG("Usage error: unsupported analyzer type. "
                "Please choose " CPU_CACHE ", " MISS_ANALYZER ", " TLB ", " HISTOGRAM
                ", " REUSE_DIST ", " BASIC_COUNTS ", " OPCODE_MIX ", " VIEW
-               ", " WORKING_SET " or " FUNC_VIEW ".\n");
+               ", " WORKING_SET ", " INSTR_COUNT " or " FUNC_VIEW ".\n");
 
         return nullptr;
     }

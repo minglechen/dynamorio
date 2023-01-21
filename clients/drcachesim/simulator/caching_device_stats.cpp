@@ -34,11 +34,17 @@
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
+#include "../common/directory_iterator.h"
 #include "../common/options.h"
 #include "caching_device_stats.h"
 
-caching_device_stats_t::caching_device_stats_t(const std::string &miss_file, const std::string &addr2line_file,
-                                               const std::string &output_file, int block_size, bool warmup_enabled,
+std::unordered_map<addr_t, caching_device_stats_t::debug_info_t *>
+    caching_device_stats_t::addr2line_map_;
+
+caching_device_stats_t::caching_device_stats_t(const std::string &miss_file,
+                                               const std::string &addr2line_file,
+                                               const std::string &output_dir,
+                                               int block_size, bool warmup_enabled,
                                                bool is_coherent, bool record_instr_misses)
     : success_(true)
     , num_hits_(0)
@@ -56,7 +62,7 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file, con
     , access_count_(block_size)
     , record_instr_access_misses_(record_instr_misses)
     , addr2line_file_(addr2line_file)
-    , output_file_(output_file)
+    , output_dir_(output_dir)
     , file_(nullptr)
 {
     if (miss_file.empty()) {
@@ -74,15 +80,10 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file, con
             dump_misses_ = true;
     }
 
-    if (addr2line_file_.empty()) {
-        map_to_line_ = false;
-    } else {
-        map_to_line_ = true;
-    }
-
-    if (output_file_.empty()) {
+    if (output_dir_.empty()) {
         write_instr_info_file_ = false;
-    } else {    
+    } else {
+        output_dir_.erase(output_dir_.find_last_not_of(DIRSEP) + 1);
         write_instr_info_file_ = true;
     }
 
@@ -96,6 +97,8 @@ caching_device_stats_t::caching_device_stats_t(const std::string &miss_file, con
     stats_map_.emplace(metric_name_t::INCLUSIVE_INVALIDATES, num_inclusive_invalidates_);
     stats_map_.emplace(metric_name_t::COHERENCE_INVALIDATES, num_coherence_invalidates_);
 
+    instr_access_hist_.data_hist = new std::unordered_map<addr_t, int_least64_t>();
+    instr_access_hist_.instr_hist = new std::unordered_map<addr_t, int_least64_t>();
 }
 
 caching_device_stats_t::~caching_device_stats_t()
@@ -107,9 +110,8 @@ caching_device_stats_t::~caching_device_stats_t()
         fclose(file_);
 #endif
     }
-    for (auto &it : addr2line_map_) {
-        delete it.second;
-    }
+    delete instr_access_hist_.data_hist;
+    delete instr_access_hist_.instr_hist;
 }
 
 void
@@ -126,8 +128,11 @@ caching_device_stats_t::access(const memref_t &memref, bool hit,
             dump_miss(memref);
 
         if (record_instr_access_misses_) {
-            if (!type_is_instr(memref.data.type))
-                ++ instr_access_hist_.access_hist[memref.data.pc];
+            if (!type_is_instr(memref.data.type)) {
+                ++(*(instr_access_hist_.data_hist))[memref.data.pc];
+            } else {
+                ++(*(instr_access_hist_.instr_hist))[memref.instr.addr];
+            }
         }
 
         check_compulsory_miss(memref.data.addr);
@@ -185,6 +190,10 @@ comp(const std::pair<addr_t, uint64_t> &l, const std::pair<addr_t, uint64_t> &r)
 bool
 caching_device_stats_t::read_csv(const std::string &file_name)
 {
+    // CSV already read
+    if (addr2line_map_.size() > 0) {
+        return true;
+    }
     std::ifstream file(file_name);
     if (!file.good()) {
         ERRMSG("Could not open file %s", file_name.c_str());
@@ -213,11 +222,12 @@ caching_device_stats_t::read_csv(const std::string &file_name)
     }
     row.readNextRow(file);
     while (!file.eof()) {
-        debug_info_t* debug_info = new debug_info_t();
+        debug_info_t *debug_info = new debug_info_t();
         debug_info->symbol = row[symbol_index];
         debug_info->path = row[path_index];
         debug_info->line = std::stoi(row[line_index]);
-        addr2line_map_.emplace(reinterpret_cast<addr_t>(std::stoul(row[addr_index])), debug_info);
+        addr2line_map_.emplace(reinterpret_cast<addr_t>(std::stoul(row[addr_index])),
+                               debug_info);
         row.readNextRow(file);
     };
     file.close();
@@ -288,7 +298,7 @@ caching_device_stats_t::print_child_stats(std::string prefix)
 }
 
 void
-caching_device_stats_t::print_stats(std::string prefix)
+caching_device_stats_t::print_stats(std::string prefix, std::string cache_name)
 {
     std::cerr.imbue(std::locale("")); // Add commas, at least for my locale
     if (warmup_enabled_) {
@@ -298,36 +308,45 @@ caching_device_stats_t::print_stats(std::string prefix)
     print_rates(prefix);
     print_child_stats(prefix);
     std::cerr.imbue(std::locale("C")); // Reset to avoid affecting later prints.
-    if (record_instr_access_misses_){
+    if (record_instr_access_misses_) {
         print_miss_hist(prefix);
         if (write_instr_info_file_) {
-            write_instr_info_file();
+            write_instr_info_file(cache_name, true);
+            write_instr_info_file(cache_name, false);
         }
     }
 }
 
 void
-caching_device_stats_t::write_instr_info_file()
+caching_device_stats_t::write_instr_info_file(std::string cache_name, bool data_miss)
 {
-    if (!map_to_line_) {
+    if (!read_csv(addr2line_file_)) {
         return;
     }
-    std::ofstream file;
-    file.open(output_file_);
+    std::unordered_map<addr_t, int_least64_t> *top =
+        data_miss ? instr_access_hist_.data_hist : instr_access_hist_.instr_hist;
+    if (top->empty()) {
+        return;
+    }
+
+    std::string file_name = data_miss ? cache_name + "_data_miss_instrs.csv"
+                                      : cache_name + "_instr_miss_instrs.csv";
+    directory_iterator_t::create_directory(output_dir_);
+    std::ofstream file(output_dir_ + DIRSEP + file_name);
+
     if (!file.good()) {
-        ERRMSG("Could not open file %s", output_file_.c_str());
+        ERRMSG("Could not open file %s", file_name.c_str());
+        file.close();
         return;
     }
     file << "addr,count,path,line,symbol" << std::endl;
 
-    auto top = instr_access_hist_.access_hist;
-
-    for (auto it = top.begin();
-        it != top.end(); ++it) {
+    for (auto it = top->begin(); it != top->end(); ++it) {
         file << (it->first) << "," << (it->second) << ",";
         auto it2 = addr2line_map_.find(it->first);
-        if (it2 != addr2line_map_.end()){
-            file << it2->second->path << "," << it2->second->line << "," << it2->second->symbol << std::endl;
+        if (it2 != addr2line_map_.end()) {
+            file << it2->second->path << "," << it2->second->line << ","
+                 << it2->second->symbol << std::endl;
         } else {
             file << "unknown,0,unknown" << std::endl;
         }
@@ -338,28 +357,30 @@ caching_device_stats_t::write_instr_info_file()
 void
 caching_device_stats_t::print_miss_hist(std::string prefix, int report_top)
 {
-    if (map_to_line_){
-        if(!read_csv(addr2line_file_)){
-            map_to_line_ = false;
-        }
+    if (instr_access_hist_.data_hist->empty()) {
+        std::cerr << std::dec;
+        return;
     }
-    std::cerr << prefix << "Top data instr misses:" << std::endl;;
-        std::vector<std::pair<addr_t, uint64_t>> top(report_top);
-        std::partial_sort_copy(instr_access_hist_.access_hist.begin(), instr_access_hist_.access_hist.end(),
-                              top.begin(), top.end(), comp);
-        for (std::vector<std::pair<addr_t, uint64_t>>::iterator it = top.begin();
-            it != top.end(); ++it) {
-            std::cerr << prefix << "  " << std::setw(16) << std::hex << std::showbase << std::left << (it->first)
-                    << std::setw(18) << std::dec << std::right << it->second << std::endl;
-            if (map_to_line_){
-                auto it2 = addr2line_map_.find(it->first);
-                if (it2 != addr2line_map_.end()){
-                    std::cerr << prefix << "    " << it2->second->path << ":" << it2->second->line << " " << it2->second->symbol << std::endl;
-                }
+    std::cerr << prefix << "Top data instr misses:" << std::endl;
+    std::vector<std::pair<addr_t, uint64_t>> top(report_top);
+    std::partial_sort_copy(instr_access_hist_.data_hist->begin(),
+                           instr_access_hist_.data_hist->end(), top.begin(), top.end(),
+                           comp);
+    for (std::vector<std::pair<addr_t, uint64_t>>::iterator it = top.begin();
+         it != top.end(); ++it) {
+        std::cerr << prefix << "  " << std::setw(16) << std::hex << std::showbase
+                  << std::left << (it->first) << std::setw(18) << std::dec << std::right
+                  << it->second << std::endl;
+        if (read_csv(addr2line_file_)) {
+            auto it2 = addr2line_map_.find(it->first);
+            if (it2 != addr2line_map_.end()) {
+                std::cerr << prefix << "    " << it2->second->path << ":"
+                          << it2->second->line << " " << it2->second->symbol << std::endl;
             }
         }
-        // Reset the i/o format for subsequent tool invocations.
-        std::cerr << std::dec;
+    }
+    // Reset the i/o format for subsequent tool invocations.
+    std::cerr << std::dec;
 }
 
 void

@@ -155,56 +155,56 @@ private:
 
 // https://stackoverflow.com/questions/1120140/how-can-i-read-and-parse-csv-files-in-c
 
-class csv_row_t
-{
-    public:
-        std::string operator[](std::size_t index) const
-        {
-            return std::string(&m_line[m_data[index] + 1], m_data[index + 1] -  (m_data[index] + 1));
-        }
-        std::size_t size() const
-        {
-            return m_data.size() - 1;
-        }
-        void readNextRow(std::istream& str)
-        {
-            std::getline(str, m_line);
+class csv_row_t {
+public:
+    std::string
+    operator[](std::size_t index) const
+    {
+        return std::string(&m_line[m_data[index] + 1],
+                           m_data[index + 1] - (m_data[index] + 1));
+    }
+    std::size_t
+    size() const
+    {
+        return m_data.size() - 1;
+    }
+    void
+    readNextRow(std::istream &str)
+    {
+        std::getline(str, m_line);
 
-            m_data.clear();
-            m_data.emplace_back(-1);
-            std::string::size_type pos = 0;
-            while((pos = m_line.find(',', pos)) != std::string::npos)
-            {
-                m_data.emplace_back(pos);
-                //check for double quotes
-                if (m_line.size() > pos + 1 && m_line[pos + 1] == '"') {
-                    pos = m_line.find("\",", pos + 2);
-                    if (pos == std::string::npos) {
-                        break;
-                    }
-                } else {
-                    pos++;
-                }
-            }
-            // This checks for a trailing comma with no data after it.
-            pos   = m_line.size();
+        m_data.clear();
+        m_data.emplace_back(-1);
+        std::string::size_type pos = 0;
+        while ((pos = m_line.find(',', pos)) != std::string::npos) {
             m_data.emplace_back(pos);
+            // check for double quotes
+            if (m_line.size() > pos + 1 && m_line[pos + 1] == '"') {
+                pos = m_line.find("\",", pos + 2);
+                if (pos == std::string::npos) {
+                    break;
+                }
+            } else {
+                pos++;
+            }
         }
-    private:
-        std::string         m_line;
-        std::vector<int>    m_data;
-};
+        // This checks for a trailing comma with no data after it.
+        pos = m_line.size();
+        m_data.emplace_back(pos);
+    }
 
+private:
+    std::string m_line;
+    std::vector<int> m_data;
+};
 
 class caching_device_stats_t {
 public:
-    explicit caching_device_stats_t(const std::string &miss_file, const std::string &addr2line_file,
-                                    const std::string &output_file,
-                                    int block_size,
-                                    bool warmup_enabled = false,
-                                    bool is_coherent = false,
-                                    bool record_instr_misses = false
-                                    );
+    explicit caching_device_stats_t(const std::string &miss_file,
+                                    const std::string &addr2line_file,
+                                    const std::string &output_dir, int block_size,
+                                    bool warmup_enabled = false, bool is_coherent = false,
+                                    bool record_instr_misses = false);
 
     virtual ~caching_device_stats_t();
 
@@ -219,12 +219,13 @@ public:
     child_access(const memref_t &memref, bool hit, caching_device_block_t *cache_block);
 
     virtual void
-    print_stats(std::string prefix);
+    print_stats(std::string prefix, std::string cache_name = "");
 
     virtual void
     reset();
 
-    virtual bool operator!()
+    virtual bool
+    operator!()
     {
         return !success_;
     }
@@ -264,7 +265,7 @@ protected:
     print_miss_hist(std::string prefix, int report_top = 10);
 
     void
-    write_instr_info_file();
+    write_instr_info_file(std::string cache_name, bool data_miss);
 
     void
     check_compulsory_miss(addr_t addr);
@@ -273,7 +274,8 @@ protected:
     read_csv(const std::string &file_name);
 
     struct instr_access_hist_t {
-        std::unordered_map<addr_t, int_least64_t> access_hist;
+        std::unordered_map<addr_t, int_least64_t> *data_hist;
+        std::unordered_map<addr_t, int_least64_t> *instr_hist;
         std::string error;
     };
 
@@ -282,6 +284,8 @@ protected:
         std::string path;
         int line;
     };
+
+    static std::unordered_map<addr_t, debug_info_t *> addr2line_map_;
 
     instr_access_hist_t instr_access_hist_;
 
@@ -314,18 +318,14 @@ protected:
 
     access_count_t access_count_;
 
-    std::unordered_map<addr_t, debug_info_t*> addr2line_map_;
-    
     bool record_instr_access_misses_;
-
-    bool map_to_line_;
 
     bool write_instr_info_file_;
 
     const std::string addr2line_file_;
 
-    const std::string output_file_;
-    
+    std::string output_dir_;
+
 #ifdef HAS_ZLIB
     gzFile file_;
 #else

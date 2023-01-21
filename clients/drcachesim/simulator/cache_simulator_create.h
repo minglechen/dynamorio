@@ -60,7 +60,7 @@ struct cache_simulator_knobs_t {
         , LL_assoc(16)
         , LL_miss_file("")
         , addr2line_file("")
-        , output_file("")
+        , output_dir("")
         , model_coherence(false)
         , replace_policy("LRU")
         , data_prefetcher("nextline")
@@ -71,7 +71,6 @@ struct cache_simulator_knobs_t {
         , cpu_scheduling(false)
         , use_physical(false)
         , record_instr_misses(false)
-        , working_set_reset_interval(0)
         , verbose(0)
     {
     }
@@ -85,7 +84,7 @@ struct cache_simulator_knobs_t {
     unsigned int LL_assoc;
     std::string LL_miss_file;
     std::string addr2line_file;
-    std::string output_file;
+    std::string output_dir;
     bool model_coherence;
     std::string replace_policy;
     std::string data_prefetcher;
@@ -96,7 +95,6 @@ struct cache_simulator_knobs_t {
     bool cpu_scheduling;
     bool use_physical;
     bool record_instr_misses;
-    uint64_t working_set_reset_interval;
     unsigned int verbose;
 };
 

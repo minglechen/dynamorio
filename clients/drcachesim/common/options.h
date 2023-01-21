@@ -53,6 +53,7 @@
 #define FUNC_VIEW "func_view"
 #define INVARIANT_CHECKER "invariant_checker"
 #define WORKING_SET "working_set"
+#define INSTR_COUNT "instr_count"
 #define CACHE_TYPE_INSTRUCTION "instruction"
 #define CACHE_TYPE_DATA "data"
 #define CACHE_TYPE_UNIFIED "unified"
@@ -80,7 +81,7 @@ extern droption_t<bytesize_t> op_LL_size;
 extern droption_t<unsigned int> op_LL_assoc;
 extern droption_t<std::string> op_LL_miss_file;
 extern droption_t<std::string> op_addr2line_file;
-extern droption_t<std::string> op_output_file;
+extern droption_t<std::string> op_output_dir;
 extern droption_t<bytesize_t> op_L0I_size;
 extern droption_t<bool> op_L0_filter_deprecated;
 extern droption_t<bool> op_L0I_filter;

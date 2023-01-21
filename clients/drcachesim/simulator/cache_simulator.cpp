@@ -105,8 +105,10 @@ cache_simulator_t::cache_simulator_t(const cache_simulator_knobs_t &knobs)
     bool warmup_enabled_ = ((knobs_.warmup_refs > 0) || (knobs_.warmup_fraction > 0.0));
 
     if (!llc->init(knobs_.LL_assoc, (int)knobs_.line_size, (int)knobs_.LL_size, NULL,
-                   new cache_stats_t((int)knobs_.line_size, knobs_.LL_miss_file, knobs_.addr2line_file,
-                                     knobs_.output_file, warmup_enabled_, false, knobs_.record_instr_misses))) {
+                   new cache_stats_t((int)knobs_.line_size, knobs_.LL_miss_file,
+                                     knobs_.addr2line_file, knobs_.output_dir,
+                                     warmup_enabled_, false,
+                                     knobs_.record_instr_misses))) {
         error_string_ =
             "Usage error: failed to initialize LL cache.  Ensure sizes and "
             "associativity are powers of 2, that the total size is a multiple "
@@ -142,14 +144,15 @@ cache_simulator_t::cache_simulator_t(const cache_simulator_knobs_t &knobs)
         if (!l1_icaches_[i]->init(
                 knobs_.L1I_assoc, (int)knobs_.line_size, (int)knobs_.L1I_size, llc,
                 new cache_stats_t((int)knobs_.line_size, "", knobs_.addr2line_file,
-                                    knobs_.output_file, knobs_.model_coherence, false),
+                                  knobs_.output_dir, warmup_enabled_,
+                                  knobs_.model_coherence, knobs_.record_instr_misses),
                 nullptr /*prefetcher*/, false /*inclusive*/, knobs_.model_coherence,
                 2 * i, snoop_filter_) ||
             !l1_dcaches_[i]->init(
                 knobs_.L1D_assoc, (int)knobs_.line_size, (int)knobs_.L1D_size, llc,
                 new cache_stats_t((int)knobs_.line_size, "", knobs_.addr2line_file,
-                                    knobs_.output_file, knobs_.model_coherence,
-                                    knobs_.record_instr_misses),
+                                  knobs_.output_dir, warmup_enabled_,
+                                  knobs_.model_coherence, knobs_.record_instr_misses),
                 knobs_.data_prefetcher == PREFETCH_POLICY_NEXTLINE
                     ? new prefetcher_t((int)knobs_.line_size)
                     : nullptr,
@@ -318,8 +321,9 @@ cache_simulator_t::cache_simulator_t(std::istream *config_file)
 
         if (!cache->init((int)cache_config.assoc, (int)knobs_.line_size,
                          (int)cache_config.size, parent_,
-                         new cache_stats_t((int)knobs_.line_size, cache_config.miss_file, "", knobs_.output_file,
-                                           warmup_enabled_, is_coherent_, knobs_.record_instr_misses),
+                         new cache_stats_t((int)knobs_.line_size, cache_config.miss_file,
+                                           "", knobs_.output_dir, warmup_enabled_,
+                                           is_coherent_, knobs_.record_instr_misses),
                          cache_config.prefetcher == PREFETCH_POLICY_NEXTLINE
                              ? new prefetcher_t((int)knobs_.line_size)
                              : nullptr,
@@ -578,12 +582,12 @@ cache_simulator_t::print_results()
         if (thread_ever_counts_[i] > 0) {
             if (l1_icaches_[i] != l1_dcaches_[i]) {
                 std::cerr << "  L1I stats:" << std::endl;
-                l1_icaches_[i]->get_stats()->print_stats("    ");
+                l1_icaches_[i]->get_stats()->print_stats("    ", "L1I");
                 std::cerr << "  L1D stats:" << std::endl;
-                l1_dcaches_[i]->get_stats()->print_stats("    ");
+                l1_dcaches_[i]->get_stats()->print_stats("    ", "L1D");
             } else {
                 std::cerr << "  unified L1 stats:" << std::endl;
-                l1_icaches_[i]->get_stats()->print_stats("    ");
+                l1_icaches_[i]->get_stats()->print_stats("    ", "L1");
             }
         }
     }
@@ -591,13 +595,13 @@ cache_simulator_t::print_results()
     // Print non-L1, non-LLC cache stats.
     for (auto &caches_it : other_caches_) {
         std::cerr << caches_it.first << " stats:" << std::endl;
-        caches_it.second->get_stats()->print_stats("    ");
+        caches_it.second->get_stats()->print_stats("    ", caches_it.first);
     }
 
     // Print LLC stats.
     for (auto &caches_it : llcaches_) {
         std::cerr << caches_it.first << " stats:" << std::endl;
-        caches_it.second->get_stats()->print_stats("    ");
+        caches_it.second->get_stats()->print_stats("    ", caches_it.first);
     }
 
     if (knobs_.model_coherence) {

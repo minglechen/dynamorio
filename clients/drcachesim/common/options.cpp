@@ -165,12 +165,12 @@ droption_t<std::string> op_addr2line_file(
     "The cache simulator needs the addr2line csv to translate addresses to "
     "source code locations.");
 
-droption_t<std::string> op_output_file(
-    DROPTION_SCOPE_FRONTEND, "output_file", "",
-    "Path for dumping instruction address count to source code mappings. ",
-    "If non-empty, when running the cache simulator, requests that "
-    "the results be written to a file at the specified path. The file "
-    "is written in csv format. ");
+droption_t<std::string>
+    op_output_dir(DROPTION_SCOPE_FRONTEND, "output_dir", "",
+                  "Path for dumping instruction address count to source code mappings. ",
+                  "If non-empty, when running the cache simulator, requests that "
+                  "the results be written to a file at the specified path. The file "
+                  "is written in csv format. ");
 
 droption_t<bool> op_L0_filter_deprecated(
     DROPTION_SCOPE_CLIENT, "L0_filter", false,
@@ -220,7 +220,8 @@ droption_t<bool> op_record_instr_misses(
     DROPTION_SCOPE_FRONTEND, "record_instr_misses", false,
     "Record top load/store instruction data misses in trace",
     "If -record_instr_misses, instruction misses are recorded in the trace."
-    "This is useful for finding instructions that perform poorly due to data cache misses.");
+    "This is useful for finding instructions that perform poorly due to data cache "
+    "misses.");
 
 droption_t<unsigned long> op_working_set_reset_interval(
     DROPTION_SCOPE_FRONTEND, "working_set_reset_interval", 0,
@@ -408,11 +409,12 @@ droption_t<std::string>
     op_simulator_type(DROPTION_SCOPE_FRONTEND, "simulator_type", CPU_CACHE,
                       "Simulator type (" CPU_CACHE ", " MISS_ANALYZER ", " TLB
                       ", " REUSE_DIST ", " REUSE_TIME ", " HISTOGRAM ", " VIEW
-                      ", " FUNC_VIEW ", " BASIC_COUNTS ", " WORKING_SET ", or " INVARIANT_CHECKER ").",
+                      ", " FUNC_VIEW ", " BASIC_COUNTS ", " WORKING_SET ", " INSTR_COUNT
+                      ", or " INVARIANT_CHECKER ").",
                       "Specifies the type of the simulator. "
                       "Supported types: " CPU_CACHE ", " MISS_ANALYZER ", " TLB
                       ", " REUSE_DIST ", " REUSE_TIME ", " HISTOGRAM ", " BASIC_COUNTS
-                      ", " WORKING_SET ", or " INVARIANT_CHECKER ".");
+                      ", " WORKING_SET ", " INSTR_COUNT ", or " INVARIANT_CHECKER ".");
 
 droption_t<unsigned int> op_verbose(DROPTION_SCOPE_ALL, "verbose", 0, 0, 64,
                                     "Verbosity level",
